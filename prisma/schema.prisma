@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Difficulty {
+  easy
+  medium
+  hard
+}
+
+enum InterviewStatus {
+  in_progress
+  completed
+  cancelled
+}
+
+enum Evaluation {
+  correct
+  partially_correct
+  incorrect
+  skipped
+}
+
+enum Sentiment {
+  positive
+  negative
+}
+
+enum InterviewMode {
+  structured
+  freehand
+}
+
+model Technology {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  questions                    Question[]
+  interviewTechnologies        InterviewTechnology[]
+  interviewQuestions           InterviewQuestion[]
+  interviewTechnologySummaries InterviewTechnologySummary[]
+  noteSuggestions               NoteSuggestion[]
+
+  @@map("technologies")
+}
+
+model Question {
+  id           String     @id @default(uuid())
+  technologyId String     @map("technology_id")
+  category     String
+  difficulty   Difficulty
+  questionText String     @map("question_text")
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  technology         Technology           @relation(fields: [technologyId], references: [id], onDelete: Cascade)
+  interviewQuestions InterviewQuestion[]
+
+  @@index([technologyId])
+  @@index([technologyId, difficulty])
+  @@map("questions")
+}
+
+model Interview {
+  id                 String          @id @default(uuid())
+  candidateName      String          @map("candidate_name")
+  interviewerName    String          @map("interviewer_name")
+  interviewType      String          @default("Technical Interview") @map("interview_type")
+  questionsPerTech   Int             @default(5) @map("questions_per_tech")
+  totalItExperience  Float?          @map("total_it_experience")
+  relevantExperience Float?          @map("relevant_experience")
+  primaryCloud       String?         @map("primary_cloud")
+  secondaryCloud     String?         @map("secondary_cloud")
+  currentTechnologyId String?        @map("current_technology_id")
+  mode               InterviewMode   @default(structured)
+  status             InterviewStatus @default(in_progress)
+  startedAt          DateTime        @default(now()) @map("started_at")
+  completedAt        DateTime?       @map("completed_at")
+  createdAt          DateTime        @default(now()) @map("created_at")
+
+  technologies        InterviewTechnology[]
+  questions           InterviewQuestion[]
+  summary             InterviewSummary?
+  technologySummaries InterviewTechnologySummary[]
+
+  @@map("interviews")
+}
+
+model InterviewTechnology {
+  id             String     @id @default(uuid())
+  interviewId    String     @map("interview_id")
+  technologyId   String     @map("technology_id")
+  questionCount  Int        @default(0) @map("question_count")
+  correctCount   Int        @default(0) @map("correct_count")
+  partialCount   Int        @default(0) @map("partial_count")
+  incorrectCount Int        @default(0) @map("incorrect_count")
+  skippedCount   Int        @default(0) @map("skipped_count")
+  score          Float?
+  order          Int        @default(0)
+  freehandNotes  String?    @map("freehand_notes")
+  startedAt      DateTime   @default(now()) @map("started_at")
+  completedAt    DateTime?  @map("completed_at")
+
+  interview  Interview  @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  technology Technology @relation(fields: [technologyId], references: [id])
+
+  @@unique([interviewId, technologyId])
+  @@index([interviewId])
+  @@map("interview_technologies")
+}
+
+model InterviewQuestion {
+  id              String      @id @default(uuid())
+  interviewId     String      @map("interview_id")
+  technologyId    String      @map("technology_id")
+  questionId      String      @map("question_id")
+  questionOrder   Int         @map("question_order")
+  evaluation      Evaluation?
+  interviewerNote String?     @map("interviewer_note")
+  answeredAt      DateTime?   @map("answered_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  interview  Interview  @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  technology Technology @relation(fields: [technologyId], references: [id])
+  question   Question   @relation(fields: [questionId], references: [id])
+
+  @@unique([interviewId, questionId])
+  @@index([interviewId, technologyId])
+  @@map("interview_questions")
+}
+
+model InterviewSummary {
+  id          String   @id @default(uuid())
+  interviewId String   @unique @map("interview_id")
+  summaryText String   @map("summary_text")
+  generatedBy String   @default("ai") @map("generated_by")
+  generatedAt DateTime @default(now()) @map("generated_at")
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@map("interview_summaries")
+}
+
+model InterviewTechnologySummary {
+  id           String   @id @default(uuid())
+  interviewId  String   @map("interview_id")
+  technologyId String   @map("technology_id")
+  summaryText  String   @map("summary_text")
+  generatedBy  String   @default("ai") @map("generated_by")
+  generatedAt  DateTime @default(now()) @map("generated_at")
+
+  interview  Interview  @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  technology Technology @relation(fields: [technologyId], references: [id])
+
+  @@unique([interviewId, technologyId])
+  @@map("interview_technology_summaries")
+}
+
+model NoteSuggestion {
+  id           String    @id @default(uuid())
+  technologyId String    @map("technology_id")
+  category     String
+  sentiment    Sentiment
+  text         String
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  technology Technology @relation(fields: [technologyId], references: [id], onDelete: Cascade)
+
+  @@index([technologyId, category])
+  @@map("note_suggestions")
+}
